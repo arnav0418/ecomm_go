@@ -70,70 +70,55 @@ func (ms *MySQLStorer) DeleteProduct(ctx context.Context, id int64) error {
 }
 
 func (ms *MySQLStorer) CreateOrder(ctx context.Context, o *Order) (*Order, error) {
-
-	//start transaction
-		//insert into orders
-		//insert into order_items
-	//commit transaction
-	//rollback transaction if error
-
 	err := ms.execTx(ctx, func(tx *sqlx.Tx) error {
-
-		//insert into orders
-
-		err := createOrder(ctx, tx, o)
+		// insert into orders
+		order, err := createOrder(ctx, tx, o)
 		if err != nil {
-			return fmt.Errorf("Error creating order: %v", err)
+			return fmt.Errorf("error creating order: %w", err)
 		}
 
 		for _, oi := range o.Items {
-			oi.OrderID = o.ID
-
-			//insert into order_items
-
-			err = createOrderItem(ctx, tx, &oi)
+			oi.OrderID = order.ID
+			// insert into order_items
+			err = createOrderItem(ctx, tx, oi)
 			if err != nil {
-				return fmt.Errorf("Error creating order item: %v", err)
+				return fmt.Errorf("error creating order item: %w", err)
 			}
 		}
-
 		return nil
 	})
-
 	if err != nil {
-		return nil, fmt.Errorf("Error creating order: %v", err)
+		return nil, fmt.Errorf("error creating order: %w", err)
 	}
 
 	return o, nil
 }
 
-func createOrder(ctx context.Context, tx *sqlx.Tx, o *Order) error {
+func createOrder(ctx context.Context, tx *sqlx.Tx, o *Order) (*Order, error) {
 	res, err := tx.NamedExecContext(ctx, "INSERT INTO orders (payment_method, tax_price, shipping_price, total_price, user_id) VALUES (:payment_method, :tax_price, :shipping_price, :total_price, :user_id)", o)
 	if err != nil {
-		return fmt.Errorf("Error inserting order: %v", err)
+		return nil, fmt.Errorf("error inserting order: %w", err)
 	}
 
 	id, err := res.LastInsertId()
 	if err != nil {
-		return fmt.Errorf("Error getting the last order id: %v", err)
+		return nil, fmt.Errorf("error getting last insert ID: %w", err)
 	}
-
 	o.ID = id
 
-	return nil
+	return o, nil
 }
 
-func createOrderItem(ctx context.Context, tx *sqlx.Tx, oi *OrderItem) error {
+func createOrderItem(ctx context.Context, tx *sqlx.Tx, oi OrderItem) error {
 	res, err := tx.NamedExecContext(ctx, "INSERT INTO order_items (name, quantity, image, price, product_id, order_id) VALUES (:name, :quantity, :image, :price, :product_id, :order_id)", oi)
 	if err != nil {
-		return fmt.Errorf("Error while inserting order item: %v", err)
+		return fmt.Errorf("error inserting order item: %w", err)
 	}
 
 	id, err := res.LastInsertId()
 	if err != nil {
-		return fmt.Errorf("Error while finding last insert id: %v", err)
+		return fmt.Errorf("error getting last insert ID: %w", err)
 	}
-
 	oi.ID = id
 
 	return nil
