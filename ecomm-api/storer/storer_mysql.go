@@ -70,7 +70,7 @@ func (ms *MySQLStorer) DeleteProduct(ctx context.Context, id int64) error {
 }
 
 func (ms *MySQLStorer) CreateOrder(ctx context.Context, o *Order) (*Order, error) {
-	
+
 	//start transaction
 		//insert into orders
 		//insert into order_items
@@ -135,6 +135,82 @@ func createOrderItem(ctx context.Context, tx *sqlx.Tx, oi *OrderItem) error {
 	}
 
 	oi.ID = id
+
+	return nil
+}
+
+func (ms *MySQLStorer) GetOrder(ctx context.Context, userID int64) (*Order, error) {
+	var o Order
+	err := ms.db.GetContext(ctx, &o, "SELECT * FROM orders WHERE user_id=?", userID)
+	if err != nil {
+		return nil, fmt.Errorf("error getting order: %w", err)
+	}
+
+	var items []OrderItem
+	err = ms.db.SelectContext(ctx, &items, "SELECT * FROM order_items WHERE order_id=?", o.ID)
+	if err != nil {
+		return nil, fmt.Errorf("error getting order items: %w", err)
+	}
+	o.Items = items
+
+	return &o, nil
+}
+
+func (ms *MySQLStorer) GetOrderStatusByID(ctx context.Context, id int64) (*Order, error) {
+	var o Order
+	err := ms.db.GetContext(ctx, &o, "SELECT id, user_id, status FROM orders WHERE id=?", id)
+	if err != nil {
+		return nil, fmt.Errorf("error getting order: %w", err)
+	}
+
+	return &o, nil
+}
+
+func (ms *MySQLStorer) ListOrders(ctx context.Context) ([]*Order, error) {
+	var orders []*Order
+	err := ms.db.SelectContext(ctx, &orders, "SELECT * FROM orders")
+	if err != nil {
+		return nil, fmt.Errorf("error listing orders: %w", err)
+	}
+
+	for i := range orders {
+		var items []OrderItem
+		err = ms.db.SelectContext(ctx, &items, "SELECT * FROM order_items WHERE order_id=?", orders[i].ID)
+		if err != nil {
+			return nil, fmt.Errorf("error getting order items: %w", err)
+		}
+		orders[i].Items = items
+	}
+
+	return orders, nil
+}
+
+func (ms *MySQLStorer) UpdateOrderStatus(ctx context.Context, o *Order) (*Order, error) {
+	_, err := ms.db.NamedExecContext(ctx, "UPDATE orders SET status=:status, updated_at=:updated_at WHERE id=:id", o)
+	if err != nil {
+		return nil, fmt.Errorf("error updating order status: %w", err)
+	}
+
+	return o, nil
+}
+
+func (ms *MySQLStorer) DeleteOrder(ctx context.Context, id int64) error {
+	err := ms.execTx(ctx, func(tx *sqlx.Tx) error {
+		_, err := tx.ExecContext(ctx, "DELETE FROM order_items WHERE order_id=?", id)
+		if err != nil {
+			return fmt.Errorf("error deleting order items: %w", err)
+		}
+
+		_, err = tx.ExecContext(ctx, "DELETE FROM orders WHERE id=?", id)
+		if err != nil {
+			return fmt.Errorf("error deleting order: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("error deleting order: %w", err)
+	}
 
 	return nil
 }
