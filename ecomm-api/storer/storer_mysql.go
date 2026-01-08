@@ -68,3 +68,94 @@ func (ms *MySQLStorer) DeleteProduct(ctx context.Context, id int64) error {
 
 	return nil
 }
+
+func (ms *MySQLStorer) CreateOrder(ctx context.Context, o *Order) (*Order, error) {
+	
+	//start transaction
+		//insert into orders
+		//insert into order_items
+	//commit transaction
+	//rollback transaction if error
+
+	err := ms.execTx(ctx, func(tx *sqlx.Tx) error {
+
+		//insert into orders
+
+		err := createOrder(ctx, tx, o)
+		if err != nil {
+			return fmt.Errorf("Error creating order: %v", err)
+		}
+
+		for _, oi := range o.Items {
+			oi.OrderID = o.ID
+
+			//insert into order_items
+
+			err = createOrderItem(ctx, tx, &oi)
+			if err != nil {
+				return fmt.Errorf("Error creating order item: %v", err)
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("Error creating order: %v", err)
+	}
+
+	return o, nil
+}
+
+func createOrder(ctx context.Context, tx *sqlx.Tx, o *Order) error {
+	res, err := tx.NamedExecContext(ctx, "INSERT INTO orders (payment_method, tax_price, shipping_price, total_price, user_id) VALUES (:payment_method, :tax_price, :shipping_price, :total_price, :user_id)", o)
+	if err != nil {
+		return fmt.Errorf("Error inserting order: %v", err)
+	}
+
+	id, err := res.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("Error getting the last order id: %v", err)
+	}
+
+	o.ID = id
+
+	return nil
+}
+
+func createOrderItem(ctx context.Context, tx *sqlx.Tx, oi *OrderItem) error {
+	res, err := tx.NamedExecContext(ctx, "INSERT INTO order_items (name, quantity, image, price, product_id, order_id) VALUES (:name, :quantity, :image, :price, :product_id, :order_id)", oi)
+	if err != nil {
+		return fmt.Errorf("Error while inserting order item: %v", err)
+	}
+
+	id, err := res.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("Error while finding last insert id: %v", err)
+	}
+
+	oi.ID = id
+
+	return nil
+}
+
+func (ms *MySQLStorer) execTx(ctx context.Context, fn func(*sqlx.Tx) error) error {
+	tx, err := ms.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("Error while starting transaction: %v", err)
+	}
+
+	err = fn(tx)
+	if err != nil {
+		if rbErr := tx.Rollback(); rbErr != nil {
+			return fmt.Errorf("Error while rolling back transaction: %v", rbErr)
+		}
+		return fmt.Errorf("Error in transaction: %v", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("Error while committing transaction: %v", err)
+	}
+
+	return nil
+}
