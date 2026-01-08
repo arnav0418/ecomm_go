@@ -12,18 +12,20 @@ type MySQLStorer struct {
 }
 
 func NewMySQLStorer(db *sqlx.DB) *MySQLStorer {
-	return &MySQLStorer{db: db}
+	return &MySQLStorer{
+		db: db,
+	}
 }
 
 func (ms *MySQLStorer) CreateProduct(ctx context.Context, p *Product) (*Product, error) {
 	res, err := ms.db.NamedExecContext(ctx, "INSERT INTO products (name, image, category, description, rating, num_reviews, price, count_in_stock) VALUES (:name, :image, :category, :description, :rating, :num_reviews, :price, :count_in_stock)", p)
 	if err != nil {
-		return nil, fmt.Errorf("Error inserting product: %w", err)
+		return nil, fmt.Errorf("error inserting product: %w", err)
 	}
 
 	id, err := res.LastInsertId()
 	if err != nil {
-		return nil, fmt.Errorf("Error while getting the last product id: %w", err)
+		return nil, fmt.Errorf("error getting last insert ID: %w", err)
 	}
 
 	p.ID = id
@@ -35,7 +37,7 @@ func (ms *MySQLStorer) GetProduct(ctx context.Context, id int64) (*Product, erro
 	var p Product
 	err := ms.db.GetContext(ctx, &p, "SELECT * FROM products WHERE id=?", id)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get product: %w", err)
+		return nil, fmt.Errorf("error getting product: %w", err)
 	}
 
 	return &p, nil
@@ -45,16 +47,16 @@ func (ms *MySQLStorer) ListProducts(ctx context.Context) ([]*Product, error) {
 	var products []*Product
 	err := ms.db.SelectContext(ctx, &products, "SELECT * FROM products")
 	if err != nil {
-		return nil, fmt.Errorf("Failed to load products: %w", err)
+		return nil, fmt.Errorf("error listing products: %w", err)
 	}
 
 	return products, nil
 }
 
 func (ms *MySQLStorer) UpdateProduct(ctx context.Context, p *Product) (*Product, error) {
-	_, err := ms.db.NamedExecContext(ctx, "UPDATE products SET name = :name, image = :image, category = :category, description = :description, rating = :rating, num_reviews = :num_reviews, price = :price, count_in_stock = :count_in_stock, updated_at = NOW() WHERE id = :id;", p)
+	_, err := ms.db.NamedExecContext(ctx, "UPDATE products SET name=:name, image=:image, category=:category, description=:description, rating=:rating, num_reviews=:num_reviews, price=:price, count_in_stock=:count_in_stock, updated_at=:updated_at WHERE id=:id", p)
 	if err != nil {
-		return nil, fmt.Errorf("Error updating product: %w", err)
+		return nil, fmt.Errorf("error updating product: %w", err)
 	}
 
 	return p, nil
@@ -63,7 +65,7 @@ func (ms *MySQLStorer) UpdateProduct(ctx context.Context, p *Product) (*Product,
 func (ms *MySQLStorer) DeleteProduct(ctx context.Context, id int64) error {
 	_, err := ms.db.ExecContext(ctx, "DELETE FROM products WHERE id=?", id)
 	if err != nil {
-		return fmt.Errorf("Error deleting product: %w", err)
+		return fmt.Errorf("error deleting product: %w", err)
 	}
 
 	return nil
@@ -95,7 +97,7 @@ func (ms *MySQLStorer) CreateOrder(ctx context.Context, o *Order) (*Order, error
 }
 
 func createOrder(ctx context.Context, tx *sqlx.Tx, o *Order) (*Order, error) {
-	res, err := tx.NamedExecContext(ctx, "INSERT INTO orders (payment_method, tax_price, shipping_price, total_price, user_id) VALUES (:payment_method, :tax_price, :shipping_price, :total_price, :user_id)", o)
+	res, err := tx.NamedExecContext(ctx, "INSERT INTO orders (payment_method, tax_price, shipping_price, total_price) VALUES (:payment_method, :tax_price, :shipping_price, :total_price)", o)
 	if err != nil {
 		return nil, fmt.Errorf("error inserting order: %w", err)
 	}
@@ -124,9 +126,9 @@ func createOrderItem(ctx context.Context, tx *sqlx.Tx, oi OrderItem) error {
 	return nil
 }
 
-func (ms *MySQLStorer) GetOrder(ctx context.Context, userID int64) (*Order, error) {
+func (ms *MySQLStorer) GetOrder(ctx context.Context, id int64) (*Order, error) {
 	var o Order
-	err := ms.db.GetContext(ctx, &o, "SELECT * FROM orders WHERE user_id=?", userID)
+	err := ms.db.GetContext(ctx, &o, "SELECT * FROM orders WHERE id=?", id)
 	if err != nil {
 		return nil, fmt.Errorf("error getting order: %w", err)
 	}
@@ -203,19 +205,19 @@ func (ms *MySQLStorer) DeleteOrder(ctx context.Context, id int64) error {
 func (ms *MySQLStorer) execTx(ctx context.Context, fn func(*sqlx.Tx) error) error {
 	tx, err := ms.db.BeginTxx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("Error while starting transaction: %v", err)
+		return fmt.Errorf("error starting transaction: %w", err)
 	}
 
 	err = fn(tx)
 	if err != nil {
 		if rbErr := tx.Rollback(); rbErr != nil {
-			return fmt.Errorf("Error while rolling back transaction: %v", rbErr)
+			return fmt.Errorf("error rolling back transaction: %w", rbErr)
 		}
-		return fmt.Errorf("Error in transaction: %v", err)
+		return fmt.Errorf("error in transaction: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("Error while committing transaction: %v", err)
+		return fmt.Errorf("error committing transaction: %w", err)
 	}
 
 	return nil
