@@ -129,6 +129,126 @@ func (h *handler) deleteProduct(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *handler) createOrder(w http.ResponseWriter, r *http.Request) {
+	var o OrderReq
+	if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	created, err := h.server.CreateOrder(h.ctx, toStorerOrder(o))
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	res := toOrderRes(created)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(res)
+}
+
+func (h *handler) getOrder(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	i, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		panic(err)
+	}
+
+	order, err := h.server.GetOrder(h.ctx, i)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	res := toOrderRes(order)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(res)
+}
+
+func (h *handler) listOrders(w http.ResponseWriter, r *http.Request) {
+	orders, err := h.server.ListOrders(h.ctx)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	var res []OrderRes
+	for _, o := range orders {
+		res = append(res, toOrderRes(&o))
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(res)
+}
+
+func (h *handler) deleteOrder(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	i, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		panic(err)
+	}
+
+	err = h.server.DeleteOrder(h.ctx, i)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func toStorerOrder(o OrderReq) *storer.Order {
+	return &storer.Order{
+		PaymentMethod: o.PaymentMethod,
+		TaxPrice:      o.TaxPrice,
+		ShippingPrice: o.ShippingPrice,
+		TotalPrice:    o.TotalPrice,
+		Items:         toStorerOrderItems(o.Items),
+	}
+}
+
+func toStorerOrderItems(items []OrderItem) []storer.OrderItem {
+	var res []storer.OrderItem
+	for _, i := range items {
+		res = append(res, storer.OrderItem{
+			Name:      i.Name,
+			Quantity:  i.Quantity,
+			Image:     i.Image,
+			Price:     i.Price,
+			ProductID: i.ProductID,
+		})
+	}
+	return res
+}
+
+func toOrderRes(o *storer.Order) OrderRes {
+	return OrderRes{
+		ID:            o.ID,
+		Items:         toOrderItems(o.Items),
+		PaymentMethod: o.PaymentMethod,
+		TaxPrice:      o.TaxPrice,
+		ShippingPrice: o.ShippingPrice,
+		TotalPrice:    o.TotalPrice,
+		CreatedAt:     o.CreatedAt,
+		UpdatedAt:     o.UpdatedAt,
+	}
+}
+
+func toOrderItems(items []storer.OrderItem) []OrderItem {
+	var res []OrderItem
+	for _, i := range items {
+		res = append(res, OrderItem{
+			Name:      i.Name,
+			Quantity:  i.Quantity,
+			Image:     i.Image,
+			Price:     i.Price,
+			ProductID: i.ProductID,
+		})
+	}
+	return res
+}
+
 func toProductRes(p *storer.Product) ProductRes {
 	return ProductRes{
 		ID:           p.ID,	

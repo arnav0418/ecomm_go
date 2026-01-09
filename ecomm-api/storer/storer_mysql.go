@@ -134,7 +134,7 @@ func (ms *MySQLStorer) GetOrder(ctx context.Context, id int64) (*Order, error) {
 	}
 
 	var items []OrderItem
-	err = ms.db.SelectContext(ctx, &items, "SELECT * FROM order_items WHERE order_id=?", o.ID)
+	err = ms.db.SelectContext(ctx, &items, "SELECT * FROM order_items WHERE order_id=?", id)
 	if err != nil {
 		return nil, fmt.Errorf("error getting order items: %w", err)
 	}
@@ -143,9 +143,8 @@ func (ms *MySQLStorer) GetOrder(ctx context.Context, id int64) (*Order, error) {
 	return &o, nil
 }
 
-
-func (ms *MySQLStorer) ListOrders(ctx context.Context) ([]*Order, error) {
-	var orders []*Order
+func (ms *MySQLStorer) ListOrders(ctx context.Context) ([]Order, error) {
+	var orders []Order
 	err := ms.db.SelectContext(ctx, &orders, "SELECT * FROM orders")
 	if err != nil {
 		return nil, fmt.Errorf("error listing orders: %w", err)
@@ -163,6 +162,7 @@ func (ms *MySQLStorer) ListOrders(ctx context.Context) ([]*Order, error) {
 	return orders, nil
 }
 
+// UpdateOrderStatus
 
 func (ms *MySQLStorer) DeleteOrder(ctx context.Context, id int64) error {
 	err := ms.execTx(ctx, func(tx *sqlx.Tx) error {
