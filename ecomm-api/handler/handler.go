@@ -66,9 +66,9 @@ func (h *handler) listProducts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res := make([]ProductRes, len(products))
-	for i, p := range products {
-		res[i] = toProductRes(p)
+	var res []ProductRes
+	for _, p := range products {
+		res = append(res, toProductRes(&p))
 	}
 
 	w.Header().Set("Content-Type", "application/json")

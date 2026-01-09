@@ -22,7 +22,7 @@ func (s *Server) GetProduct(ctx context.Context, id int64) (*storer.Product, err
 	return s.storer.GetProduct(ctx,id)
 }
 
-func (s *Server) ListProducts(ctx context.Context) ([]*storer.Product, error) {
+func (s *Server) ListProducts(ctx context.Context) ([]storer.Product, error) {
 	return s.storer.ListProducts(ctx)
 }
 
