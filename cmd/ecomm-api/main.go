@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/arnav0418/ecomm_go/db"
+	"github.com/arnav0418/ecomm_go/ecomm-api/handler"
 	"github.com/arnav0418/ecomm_go/ecomm-api/server"
 	"github.com/arnav0418/ecomm_go/ecomm-api/storer"
 )
@@ -21,4 +22,8 @@ func main() {
 	// doing something with the database
 	st := storer.NewMySQLStorer(db.GetDB())
 	srv := server.NewServer(st)
+
+	hdl := handler.NewHandler(srv)
+	handler.RegisterRoutes(hdl)
+	handler.Start(":8080")
 }
