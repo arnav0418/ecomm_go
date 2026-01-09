@@ -23,6 +23,6 @@ func (d *Database) Close() error {
 	return d.db.Close()
 }
 
-func GetDB(d *Database) *sqlx.DB {
+func (d *Database) GetDB() *sqlx.DB {
 	return d.db
 }
