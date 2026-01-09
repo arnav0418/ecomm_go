@@ -143,15 +143,6 @@ func (ms *MySQLStorer) GetOrder(ctx context.Context, id int64) (*Order, error) {
 	return &o, nil
 }
 
-func (ms *MySQLStorer) GetOrderStatusByID(ctx context.Context, id int64) (*Order, error) {
-	var o Order
-	err := ms.db.GetContext(ctx, &o, "SELECT id, user_id, status FROM orders WHERE id=?", id)
-	if err != nil {
-		return nil, fmt.Errorf("error getting order: %w", err)
-	}
-
-	return &o, nil
-}
 
 func (ms *MySQLStorer) ListOrders(ctx context.Context) ([]*Order, error) {
 	var orders []*Order
@@ -172,14 +163,6 @@ func (ms *MySQLStorer) ListOrders(ctx context.Context) ([]*Order, error) {
 	return orders, nil
 }
 
-func (ms *MySQLStorer) UpdateOrderStatus(ctx context.Context, o *Order) (*Order, error) {
-	_, err := ms.db.NamedExecContext(ctx, "UPDATE orders SET status=:status, updated_at=:updated_at WHERE id=:id", o)
-	if err != nil {
-		return nil, fmt.Errorf("error updating order status: %w", err)
-	}
-
-	return o, nil
-}
 
 func (ms *MySQLStorer) DeleteOrder(ctx context.Context, id int64) error {
 	err := ms.execTx(ctx, func(tx *sqlx.Tx) error {
