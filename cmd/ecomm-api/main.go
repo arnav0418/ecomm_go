@@ -2,7 +2,10 @@ package main
 
 import (
 	"log"
+
 	"github.com/arnav0418/ecomm_go/db"
+	"github.com/arnav0418/ecomm_go/ecomm-api/server"
+	"github.com/arnav0418/ecomm_go/ecomm-api/storer"
 )
 
 func main() {
@@ -16,5 +19,6 @@ func main() {
 	log.Printf("Successfully connected to db")
 
 	// doing something with the database
-	// st := storer.NewMySQLStorer(db.GetDB())
+	st := storer.NewMySQLStorer(db.GetDB())
+	srv := server.NewServer(st)
 }
