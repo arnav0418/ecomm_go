@@ -27,7 +27,6 @@ func (ms *MySQLStorer) CreateProduct(ctx context.Context, p *Product) (*Product,
 	if err != nil {
 		return nil, fmt.Errorf("error getting last insert ID: %w", err)
 	}
-
 	p.ID = id
 
 	return p, nil

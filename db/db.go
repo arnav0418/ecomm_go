@@ -14,7 +14,7 @@ type Database struct {
 func NewDatabase() (*Database, error) {
 	db, err := sqlx.Open("mysql", "root:password@tcp(localhost:3306)/ecomm?parseTime=true")
 	if err != nil {
-		return nil, fmt.Errorf("Error while opening the database: %w", err)
+		return nil, fmt.Errorf("error opening database: %w", err)
 	}
 
 	return &Database{db: db}, nil

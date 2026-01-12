@@ -11,18 +11,15 @@ import (
 
 func main() {
 	db, err := db.NewDatabase()
-
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Fatalf("error opening database: %v", err)
 	}
-
 	defer db.Close()
-	log.Printf("Successfully connected to db")
+	log.Println("successfully connected to database")
 
-	// doing something with the database
+	// do something with the database
 	st := storer.NewMySQLStorer(db.GetDB())
 	srv := server.NewServer(st)
-
 	hdl := handler.NewHandler(srv)
 	handler.RegisterRoutes(hdl)
 	handler.Start(":8080")
