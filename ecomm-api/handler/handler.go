@@ -11,17 +11,20 @@ import (
 	"github.com/arnav0418/ecomm_go/ecomm-api/storer"
 	"github.com/arnav0418/ecomm_go/util"
 	"github.com/go-chi/chi"
+	"github.com/arnav0418/ecomm_go/token"
 )
 
 type handler struct {
 	ctx    context.Context
 	server *server.Server
+	tokenMaker  *token.JWTMaker
 }
 
-func NewHandler(server *server.Server) *handler {
+func NewHandler(server *server.Server, secretKey string) *handler {
 	return &handler{
 		ctx:    context.Background(),
 		server: server,
+		tokenMaker: token.NewJWTMaker(secretKey),
 	}
 }
 
@@ -313,7 +316,7 @@ func toOrderItems(items []storer.OrderItem) []OrderItem {
 	return res
 }
 
-func (h *handler) createUser(w http.ResponseWriter, r http.Request) {
+func (h *handler) createUser(w http.ResponseWriter, r *http.Request) {
 	var u UserReq
 	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
 		return 
@@ -436,4 +439,46 @@ func (h handler) deleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *handler) loginUser(w http.ResponseWriter, r *http.Request) {
+	var u LoginUserReq
+	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
+		http.Error(w, "Error decoding request body", http.StatusBadRequest)
+		return 
+	}
+
+	gu, err := h.server.GetUser(h.ctx, u.Email)
+	if err != nil {
+		http.Error(w, "Error getting the user", http.StatusInternalServerError)
+		return
+	}
+
+	err = util.CheckPassword(gu.Password, u.Password)
+	if err != nil {
+		http.Error(w, "Wrong Password", http.StatusUnauthorized)
+		return 
+	}
+
+	// create a jwt and return it in response
+
+	access_token, _, err := h.tokenMaker.CreateToken(gu.ID, gu.Email, gu.IsAdmin, 15*time.Minute)
+	if err != nil {
+		http.Error(w, "error creating token", http.StatusInternalServerError)
+		return 
+	}
+
+	res := LoginUserRes{
+		AccessToken: access_token,
+		User: UserRes{
+			Name:     gu.Name,
+			Email:    gu.Email,
+			IsAdmin:  gu.IsAdmin,
+		},
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(res)
+
 }
