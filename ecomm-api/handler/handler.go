@@ -468,17 +468,115 @@ func (h *handler) loginUser(w http.ResponseWriter, r *http.Request) {
 		return 
 	}
 
+	refreshToken, refreshClaims, err := h.tokenMaker.CreateToken(gu.ID, gu.Email, gu.IsAdmin, 24*time.Hour)
+	if err != nil {
+		http.Error(w, "error creating refresh token", http.StatusInternalServerError)
+		return 
+	}
+
+	session, err := h.server.CreateSession(h.ctx, &storer.Session{
+		ID: refreshClaims.RegisteredClaims.ID,
+		UserEmail: gu.Email,
+		RefreshToken: refreshToken,
+		IsRevoked: false,
+		ExpiresAt: refreshClaims.RegisteredClaims.ExpiresAt.Time,
+	})
+	if err != nil {
+		http.Error(w, "error creating session", http.StatusInternalServerError)
+		return 
+	}
+
 	res := LoginUserRes{
+		SessionID: session.ID,
+		RefreshToken: refreshToken,
+		AccessTokenExpiresAt: time.Now().Add(15 * time.Minute),
+		RefreshTokenExpiresAt: refreshClaims.RegisteredClaims.ExpiresAt.Time,
 		AccessToken: access_token,
-		User: UserRes{
-			Name:     gu.Name,
-			Email:    gu.Email,
-			IsAdmin:  gu.IsAdmin,
-		},
+		User: toUserRes(gu),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(res)
 
+}
+
+func (h *handler) logoutUser(w http.ResponseWriter, r *http.Request) {
+	// we will later get the session ID from the token payload of the authenticated user
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "missing session ID", http.StatusBadRequest)
+		return
+	}
+
+	err := h.server.DeleteSession(h.ctx, id)
+	if err != nil {
+		http.Error(w, "error deleting session", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *handler) renewAccessToken(w http.ResponseWriter, r *http.Request) {
+	var req RenewAccessTokenReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "error decoding request body", http.StatusBadRequest)
+		return
+	}
+
+	refreshClaims, err := h.tokenMaker.VerifyToken(req.RefreshToken)
+	if err != nil {
+		http.Error(w, "invalid refresh token", http.StatusUnauthorized)
+		return
+	}
+
+	session, err := h.server.GetSession(h.ctx, refreshClaims.RegisteredClaims.ID)
+	if err != nil {
+		http.Error(w, "error getting session", http.StatusInternalServerError)
+		return
+	}
+
+	if session.IsRevoked {
+		http.Error(w, "session has been revoked", http.StatusUnauthorized)
+		return
+	}
+
+	if session.UserEmail != refreshClaims.Email {
+		http.Error(w, "invalid session user", http.StatusUnauthorized)
+		return
+	}
+
+	accessToken, accessClaims, err := h.tokenMaker.CreateToken(refreshClaims.ID, refreshClaims.Email, refreshClaims.IsAdmin, 15*time.Minute)
+	if err != nil {
+		http.Error(w, "error creating access token", http.StatusInternalServerError)
+		return
+	}
+
+	res := RenewAccessTokenRes{
+		AccessToken: accessToken,
+		AccessTokenExpiresAt: accessClaims.RegisteredClaims.ExpiresAt.Time,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(res)
+}
+
+func (h *handler) revokeSession(w http.ResponseWriter, r *http.Request) {
+	// to be implemented
+	// we will get session id from the token payload of the authenticated user
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "missing session ID", http.StatusBadRequest)
+		return
+	}
+
+	err := h.server.RevokeSession(h.ctx, id)
+	if err != nil {
+		http.Error(w, "error revoking session", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
