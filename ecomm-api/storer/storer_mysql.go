@@ -234,7 +234,7 @@ func (ms *MySQLStorer) GetUser(ctx context.Context, email string) (*User, error)
 func (ms *MySQLStorer) ListUsers(ctx context.Context) ([]User, error) {
 	var users []User
 
-	err := ms.db.SelectContext(ctx, users, "SELECT * FROM users")
+	err := ms.db.SelectContext(ctx, &users, "SELECT * FROM users")
 	if err != nil {
 		return nil, fmt.Errorf("Error while listing users: %v", err)
 	}
@@ -243,7 +243,7 @@ func (ms *MySQLStorer) ListUsers(ctx context.Context) ([]User, error) {
 }
 
 func (ms *MySQLStorer) UpdateUser(ctx context.Context, u *User) (*User, error) {
-	_, err := ms.db.NamedExecContext(ctx, "UPDATE user SET name = :name, email = :email, password = :password, is_admin = :is_admin, updated_at = :updated_at WHERE id=:id", u)
+	_, err := ms.db.NamedExecContext(ctx, "UPDATE users SET name = :name, email = :email, password = :password, is_admin = :is_admin, updated_at = :updated_at WHERE id=:id", u)
 	if err != nil {
 		return nil, fmt.Errorf("Error updating user: %v", err)
 	}
@@ -252,7 +252,7 @@ func (ms *MySQLStorer) UpdateUser(ctx context.Context, u *User) (*User, error) {
 }
 
 func (ms *MySQLStorer) DeleteUser(ctx context.Context, id int64) error {
-	_, err := ms.db.ExecContext(ctx, "DELETE FROM user WHERE id=?", id)
+	_, err := ms.db.ExecContext(ctx, "DELETE FROM users WHERE id=?", id)
 	if err != nil {
 		return fmt.Errorf("Error deleting user: %v", err)
 	}
